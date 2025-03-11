@@ -45,12 +45,6 @@ class TestLogic(TestCase):
         response = self.client.post(self.create_url, data=self.update_data)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
-    # def SetUp(self):
-    #     """Авторизуем обоих пользователей"""
-    #     super().setUp()
-    #     self.client.force_login(self.author)
-    #     self.client.force_login(self.not_author)
-
     def test_logged_in_user_can_create_note(self):
         """Залогиненный пользователь может создать заметку"""
         self.client.force_login(self.author)

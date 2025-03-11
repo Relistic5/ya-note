@@ -22,45 +22,40 @@ class TestContent(TestCase):
             slug='note',
             author=cls.author)
 
+        cls.urls = {
+            'list': reverse_lazy('notes:list'),
+            'add': reverse_lazy('notes:add'),
+            'edit': reverse_lazy('notes:edit', kwargs={'slug': cls.note.slug}),
+        }
+
     def test_note_visibility(self):
         """Доступность заметок для авторов и неавторов"""
         test_cases = (
             (self.author, True),
             (self.not_author, False),
         )
-        for client, expected_result in test_cases:
-            with self.subTest(client=client):
-                self.client.force_login(client)
-                response = self.client.get(reverse_lazy('notes:list'))
+        for user, expected_result in test_cases:
+            with self.subTest(user=user):
+                self.client.force_login(user)
+                response = self.client.get(self.urls['list'])
                 object_list = response.context['object_list']
-
-                # Проверяем, присутствует ли заметка в object_list
-                note_exists = any(
-                    note.slug == self.note.slug for note in object_list)
-
+                note_visible = self.note in object_list
                 self.assertIs(
-                    note_exists,
-                    expected_result,
-                    msg=f'Пользователь'
-                        f' {client.username} должен'
-                        f' {'видеть' if expected_result else 'не видеть'}'
-                        f' заметку.'
+                    note_visible, expected_result,
+                    msg=f'Пользователь {user.username} должен \
+                        {'видеть' if expected_result else 'не видеть'} заметку.'
                 )
-
-    def check_form_view(self, url):
-        """Для проверки наличия формы на странице"""
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertIsInstance(response.context['form'], NoteForm)
 
     def test_note_form_views(self):
         """Наличие формы на страницах создания и редактирования"""
         test_cases = (
-            (self.author, reverse_lazy(
-                'notes:add')),
-            (self.author, reverse_lazy(
-                'notes:edit', kwargs={'slug': self.note.slug})),
+            (self.author, self.urls['add']),
+            (self.author, self.urls['edit']),
         )
         for user, url in test_cases:
             self.client.force_login(user)
-            self.check_form_view(url)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, HTTPStatus.OK)
+            with self.subTest(user=user, url=url):
+                self.assertIn('form', response.context)
+                self.assertIsInstance(response.context['form'], NoteForm)

@@ -8,7 +8,7 @@ User = get_user_model()
 
 
 class TestRoutes(TestCase):
-    # Фикстуры для маршрутов
+
     home_url = 'notes:home'
     signup_url = 'users:signup'
     login_url = 'users:login'
@@ -46,11 +46,11 @@ class TestRoutes(TestCase):
     def test_redirect_user(self):
         """Редирект анонимных пользователей"""
         urls = (
-            (self.list_url, []),
-            (self.add_url, []),
-            (self.edit_url, [self.note.slug]),
-            (self.delete_url, [self.note.slug]),
-            (self.detail_url, [self.note.slug]),
+            (self.list_url, ()),
+            (self.add_url, ()),
+            (self.edit_url, (self.note.slug,)),
+            (self.delete_url, (self.note.slug,)),
+            (self.detail_url, (self.note.slug,)),
         )
         for name, args in urls:
             with self.subTest(name=name):
