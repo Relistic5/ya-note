@@ -12,6 +12,7 @@ class TestRoutes(TestCase):
     home_url = 'notes:home'
     signup_url = 'users:signup'
     login_url = 'users:login'
+    logout_url = 'users:logout'
     list_url = 'notes:list'
     add_url = 'notes:add'
     success_url = 'notes:success'
@@ -23,6 +24,7 @@ class TestRoutes(TestCase):
     def setUpTestData(cls):
         cls.author = User.objects.create(username='Автор')
         cls.not_author = User.objects.create(username='Неавтор')
+
         cls.note = Note.objects.create(
             title='Название заметки',
             text='Текст заметки',
@@ -36,7 +38,7 @@ class TestRoutes(TestCase):
             self.home_url,
             self.signup_url,
             self.login_url,
-            # 'users:logout',
+            self.logout_url,
         )
         for name in urls:
             with self.subTest(name=name):
@@ -57,7 +59,7 @@ class TestRoutes(TestCase):
                 url = reverse_lazy(name, args=args)
                 response = self.client.get(url)
                 self.assertRedirects(
-                    response, f"{reverse_lazy(self.login_url)}?next={url}")
+                    response, f'{reverse_lazy(self.login_url)}?next={url}')
 
     def test_authenticated_user_access(self):
         """Аутентифицированному пользователю доступны
@@ -91,7 +93,7 @@ class TestRoutes(TestCase):
             with self.subTest(user=user.username):
                 self.client.force_login(user)
                 for name, slug in urls:
-                    with self.subTest(name=f"{name} проверка доступа"):
+                    with self.subTest(name=f'{name} проверка доступа'):
                         url = reverse_lazy(name, args=[slug])
                         response = self.client.get(url)
                         self.assertEqual(response.status_code, expected_status)
