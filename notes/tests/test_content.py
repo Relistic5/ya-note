@@ -1,51 +1,66 @@
-from django.contrib.auth.models import User
+from http import HTTPStatus
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse_lazy
 
 from notes.forms import NoteForm
 from notes.models import Note
 
+User = get_user_model()
 
-class NotesTestCase(TestCase):
 
-    def setUp(self):
-        self.author = User.objects.create_user(
-            username='author', password='password')
-        self.not_author = User.objects.create_user(
-            username='not_author', password='password')
-        self.note = Note.objects.create(
-            title='Заголовок', text='Текст заметки',
-            slug='author-note', author=self.author)
+class TestContent(TestCase):
 
-        self.client.login(username='author', password='password')
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create(username='Автор')
+        cls.not_author = User.objects.create(username='Неавтор')
+        cls.note = Note.objects.create(
+            title='Название заметки',
+            text='Текст заметки',
+            slug='note',
+            author=cls.author)
 
-    def test_note_detail_in_context(self):
-        """Заметка передается в контексте страницы"""
-        response = self.client.get(reverse_lazy('notes:list'))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('object_list', response.context)
-        self.assertIn(self.note, response.context['object_list'])
+    def test_note_visibility(self):
+        """Доступность заметок для авторов и неавторов"""
+        test_cases = (
+            (self.author, True),
+            (self.not_author, False),
+        )
+        for client, expected_result in test_cases:
+            with self.subTest(client=client):
+                self.client.force_login(client)
+                response = self.client.get(reverse_lazy('notes:list'))
+                object_list = response.context['object_list']
 
-    def test_other_user_notes_not_in_list(self):
-        """Заметка другого пользователя"""
-        Note.objects.create(
-            title='Другой пользователь', text='Текст заметки другого юзера',
-            slug='not-author-note', author=self.not_author)
-        response = self.client.get(reverse_lazy('notes:list'))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn(Note.objects.get(
-            title='Другой пользователь'), response.context['object_list'])
-        self.assertIn(self.note, response.context['object_list'])
+                # Проверяем, присутствует ли заметка в object_list
+                note_exists = any(
+                    note.slug == self.note.slug for note in object_list)
 
-    def test_create_note_form_is_passed(self):
-        """Форма создания заметки передается на страницу"""
-        response = self.client.get(reverse_lazy('notes:add'))
-        self.assertEqual(response.status_code, 200)
+                self.assertIs(
+                    note_exists,
+                    expected_result,
+                    msg=f'Пользователь'
+                        f' {client.username} должен'
+                        f' {'видеть' if expected_result else 'не видеть'}'
+                        f' заметку.'
+                )
+
+    def check_form_view(self, url):
+        """Для проверки наличия формы на странице"""
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIsInstance(response.context['form'], NoteForm)
 
-    def test_edit_note_form_is_passed(self):
-        """Форма редактирования заметки передается на страницу"""
-        response = self.client.get(reverse_lazy(
-            'notes:edit', args=[self.note.slug]))
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.context['form'], NoteForm)
+    def test_note_form_views(self):
+        """Наличие формы на страницах создания и редактирования"""
+        test_cases = (
+            (self.author, reverse_lazy(
+                'notes:add')),
+            (self.author, reverse_lazy(
+                'notes:edit', kwargs={'slug': self.note.slug})),
+        )
+        for user, url in test_cases:
+            self.client.force_login(user)
+            self.check_form_view(url)

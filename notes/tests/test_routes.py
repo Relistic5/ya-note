@@ -1,55 +1,88 @@
 from http import HTTPStatus
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse_lazy
 
 from notes.models import Note
 
+User = get_user_model()
+
 
 class TestRoutes(TestCase):
 
-    def setUp(self):
-        self.author = User.objects.create_user(
-            username='author', password='password')
-        self.not_author = User.objects.create_user(
-            username='not_author', password='password')
-        self.client.login(
-            username='author', password='password')
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create(username='Автор')
+        cls.not_author = User.objects.create(username='Неавтор')
+        cls.note = Note.objects.create(
+            title='Название заметки',
+            text='Текст заметки',
+            slug='note',
+            author=cls.author)
 
-        self.note = Note.objects.create(
-            title='Заголовок', text='Текст заметки',
-            slug='test-note', author=self.author)
-
-    def test_pages_availability_for_anonymous_user(self):
-        """Доступность страниц анонимным пользователям"""
-        urls = ['notes:home', 'users:login', 'users:signup']
+    def test_pages_availability(self):
+        """Страницы(index, регистрация, вход и выход) доступны всем"""
+        urls = (
+            'notes:home',
+            'users:signup',
+            'users:login'
+            # 'users:logout',
+        )
         for name in urls:
-            url = reverse_lazy(name)
-            response = self.client.get(url)
-            self.assertEqual(response.status_code, HTTPStatus.OK)
+            with self.subTest(name=name):
+                response = self.client.get(reverse_lazy(name))
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    def test_pages_availability_for_auth_user(self):
-        """Доступность страниц авторизованным пользователям"""
-        auth_urls = ['notes:list', 'notes:add', 'notes:success']
-        for name in auth_urls:
-            url = reverse_lazy(name)
-            response = self.client.get(url)
-            self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_redirect_user(self):
+        """Редирект анонимных пользователей"""
+        urls = (
+            ('notes:list', None),
+            ('notes:add', None),
+            ('notes:edit', self.note.slug,),
+            ('notes:delete', self.note.slug,),
+            ('notes:detail', self.note.slug,)
+        )
+        for name, args in urls:
+            with self.subTest(name=name):
+                url = reverse_lazy(name, args=[args] if args else [])
+                response = self.client.get(url)
+                self.assertRedirects(
+                    response, f"{reverse_lazy('users:login')}?next={url}")
 
-    def test_pages_availability_for_different_users(self):
-        """Доступ к страницам не-авторов заметок"""
-        self.client.logout()
-        self.client.login(username='not_author', password='password')
-
-        urls = ['notes:list', 'notes:add', 'notes:success']
+    def test_authenticated_user_access(self):
+        """Аутентифицированному пользователю доступны
+        страницы списка заметок и добавления заметок
+        """
+        self.client.force_login(self.author)
+        urls = (
+            'notes:list',
+            'notes:add',
+            'notes:success',
+        )
         for name in urls:
-            url = reverse_lazy(name)
-            response = self.client.get(url)
-            self.assertEqual(response.status_code, HTTPStatus.OK)
+            with self.subTest(name=name):
+                response = self.client.get(reverse_lazy(name))
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    def test_note_detail_redirect(self):
-        """Редирект"""
-        url = reverse_lazy('notes:detail', args=[self.note.slug])
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_access_to_note_pages(self):
+        """Доступ к заметкам, страницам редактирования и
+        удаления для авторов и неавторов
+        """
+        users_statuses = (
+            (self.author, HTTPStatus.OK),
+            (self.not_author, HTTPStatus.NOT_FOUND),
+        )
+        urls = (
+            ('notes:edit', self.note.slug),
+            ('notes:delete', self.note.slug),
+            ('notes:detail', self.note.slug),
+        )
+        for user, expected_status in users_statuses:
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                for name, slug in urls:
+                    with self.subTest(name=f"{name} проверка доступа"):
+                        url = reverse_lazy(name, args=[slug])
+                        response = self.client.get(url)
+                        self.assertEqual(response.status_code, expected_status)
