@@ -45,28 +45,29 @@ class TestRoutes(TestCase):
     def test_pages_availability(self):
         """Страницы (index, регистрация, вход) доступны всем"""
         urls = ['home', 'signup', 'login']
-        for name in urls:
-            with self.subTest(name=name):
-                response = self.client.get(self.urls[name])
+        for url_key in urls:
+            with self.subTest(url=url_key):
+                response = self.client.get(self.urls[url_key])
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_redirect_user(self):
         """Редирект анонимных пользователей"""
         urls = ['list', 'add', 'edit', 'delete', 'detail']
-        for name in urls:
-            with self.subTest(name=name):
-                response = self.client.get(self.urls[name])
+        for url_key in urls:
+            with self.subTest(url=url_key):
+                response = self.client.get(self.urls[url_key])
                 self.assertRedirects(
-                    response, f'{self.urls["login"]}?next={self.urls[name]}')
+                    response,
+                    f'{self.urls["login"]}?next={self.urls[url_key]}')
 
     def test_authenticated_user_access(self):
         """Аутентифицированному пользователю доступны
         страницы списка заметок и добавления заметок
         """
         urls = ['list', 'add', 'success']
-        for name in urls:
-            with self.subTest(name=name):
-                response = self.author_client.get(self.urls[name])
+        for url_key in urls:
+            with self.subTest(url=url_key):
+                response = self.author_client.get(self.urls[url_key])
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_access_to_note_pages(self):
@@ -80,7 +81,7 @@ class TestRoutes(TestCase):
         urls = ['edit', 'delete', 'detail']
         for client, expected_status in users_statuses:
             with self.subTest(client=client):
-                for name in urls:
-                    with self.subTest(name=f'{name} проверка доступа'):
-                        response = client.get(self.urls[name])
+                for url_key in urls:
+                    with self.subTest(url=f'{url_key} проверка доступа'):
+                        response = client.get(self.urls[url_key])
                         self.assertEqual(response.status_code, expected_status)

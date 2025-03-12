@@ -18,10 +18,17 @@ class TestLogic(TestCase):
         cls.author = User.objects.create(username='Автор')
         cls.not_author = User.objects.create(username='Неавтор')
 
+        cls.note = Note.objects.create(
+            title='Название заметки',
+            text='Текст заметки',
+            slug='note',
+            author=cls.author
+        )
+
         cls.form_data = {
             'title': 'Другая заметка',
             'text': 'Другой текст',
-            'slug': 'note',
+            'slug': 'note2',
         }
 
         cls.create_url = reverse_lazy('notes:add')
@@ -39,16 +46,16 @@ class TestLogic(TestCase):
         """Анонимный пользователь не может создать заметку"""
         response = self.client.post(self.create_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(Note.objects.count(), 0, 'Заметка создана анонимом')
+        self.assertEqual(Note.objects.count(), 1, 'Заметка создана анонимом')
 
     def test_login_user_can_create_note(self):
         """Залогиненный пользователь может создать заметку"""
         response = self.author_client.post(
             self.create_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(Note.objects.count(), 1, 'Не удалось создать заметку')
+        self.assertEqual(Note.objects.count(), 2, 'Не удалось создать заметку')
 
-        note = Note.objects.get()
+        note = Note.objects.filter().last()
         self.assertEqual(
             note.title, self.form_data['title'], 'Неверный Заголовок')
         self.assertEqual(
@@ -65,28 +72,12 @@ class TestLogic(TestCase):
         response = self.author_client.post(
             self.create_url, data=self.form_data)
         self.assertRedirects(response, self.success_url)
-        self.assertEqual(Note.objects.count(), 1)
+        self.assertEqual(Note.objects.count(), 2)
 
         created_note = Note.objects.last()
         self.assertEqual(
             created_note.slug, expected_slug,
             'Слаг не соответствует ожидаемому')
-
-
-class TestLogicWithNote(TestLogic):
-
-    def setUp(self):
-        """Заранее создаем note, кроме тестов, где она не нужна"""
-        super().setUp()
-        if self._testMethodName not in ['test_login_user_can_create_note',
-                                        'test_anonymous_cannot_create_note',
-                                        'test_empty_slug']:
-            self.note = Note.objects.create(
-                title='Название заметки',
-                text='Текст заметки',
-                slug='note',
-                author=self.author
-            )
 
     def test_author_can_edit_own_note(self):
         """Автор может редактировать свою заметку"""
@@ -111,18 +102,17 @@ class TestLogicWithNote(TestLogic):
 
     def test_not_author_cannot_edit_note(self):
         """Неавтор не может редактировать заметку автора"""
-        original_note = self.note
         response_edit = self.not_author_client.post(
             self.edit_url, data=self.form_data)
         self.assertEqual(response_edit.status_code, HTTPStatus.NOT_FOUND)
-        updated_note = Note.objects.get(id=original_note.id)
+        updated_note = Note.objects.get(id=self.note.id)
 
         self.assertEqual(
-            original_note.title, updated_note.title, 'Изменился Заголовок')
+            self.note.title, updated_note.title, 'Изменился Заголовок')
         self.assertEqual(
-            original_note.text, updated_note.text, 'Изменился Текст')
+            self.note.text, updated_note.text, 'Изменился Текст')
         self.assertEqual(
-            original_note.slug, updated_note.slug, 'Изменился Слаг')
+            self.note.slug, updated_note.slug, 'Изменился Слаг')
 
     def test_not_author_cannot_delete_note(self):
         """Неавтор не может удалить заметку автора"""
