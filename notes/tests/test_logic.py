@@ -125,8 +125,6 @@ class TestLogic(TestCase):
 
     def test_not_unique_slug(self):
         """Нельзя создать заметку со слагом, который уже существует"""
-        self.author_client.force_login(self.author)
-
         self.form_data['slug'] = self.note.slug
         response = self.author_client.post(
             self.create_url, data=self.form_data)
@@ -139,7 +137,6 @@ class TestLogic(TestCase):
 
     def test_empty_slug(self):
         """Проверка автоматической генерации слага"""
-        self.author_client.force_login(self.author)
         Note.objects.filter().delete()
 
         expected_slug = slugify(self.form_data['title'])
