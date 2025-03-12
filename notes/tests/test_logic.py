@@ -35,15 +35,16 @@ class TestLogic(TestCase):
         cls.not_author_client = Client()
         cls.not_author_client.force_login(cls.not_author)
 
-    def test_anonymous_user_cannot_create_note(self):
+    def test_anonymous_cannot_create_note(self):
         """Анонимный пользователь не может создать заметку"""
         response = self.client.post(self.create_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(Note.objects.count(), 0, 'Заметка создана анонимом')
 
-    def test_logged_in_user_can_create_note(self):
+    def test_login_user_can_create_note(self):
         """Залогиненный пользователь может создать заметку"""
-        response = self.author_client.post(self.create_url, data=self.form_data)
+        response = self.author_client.post(
+            self.create_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(Note.objects.count(), 1, 'Не удалось создать заметку')
 
@@ -61,12 +62,15 @@ class TestLogic(TestCase):
         """Проверка автоматической генерации слага"""
         expected_slug = slugify(self.form_data['title'])
         self.form_data.pop('slug')
-        response = self.author_client.post(self.create_url, data=self.form_data)
+        response = self.author_client.post(
+            self.create_url, data=self.form_data)
         self.assertRedirects(response, self.success_url)
         self.assertEqual(Note.objects.count(), 1)
 
         created_note = Note.objects.last()
-        self.assertEqual(created_note.slug, expected_slug, 'Слаг не соответствует ожидаемому')
+        self.assertEqual(
+            created_note.slug, expected_slug,
+            'Слаг не соответствует ожидаемому')
 
 
 class TestLogicWithNote(TestLogic):
@@ -74,8 +78,8 @@ class TestLogicWithNote(TestLogic):
     def setUp(self):
         """Заранее создаем note, кроме тестов, где она не нужна"""
         super().setUp()
-        if not self._testMethodName in ['test_logged_in_user_can_create_note',
-                                        'test_anonymous_user_cannot_create_note',
+        if self._testMethodName not in ['test_login_user_can_create_note',
+                                        'test_anonymous_cannot_create_note',
                                         'test_empty_slug']:
             self.note = Note.objects.create(
                 title='Название заметки',
@@ -86,13 +90,17 @@ class TestLogicWithNote(TestLogic):
 
     def test_author_can_edit_own_note(self):
         """Автор может редактировать свою заметку"""
-        response_edit = self.author_client.post(self.edit_url, data=self.form_data)
+        response_edit = self.author_client.post(
+            self.edit_url, data=self.form_data)
         self.assertEqual(response_edit.status_code, HTTPStatus.FOUND)
 
         self.note.refresh_from_db()
-        self.assertEqual(self.note.title, self.form_data['title'], 'Заголовок не обновили')
-        self.assertEqual(self.note.text, self.form_data['text'], 'Текст не обновили')
-        self.assertEqual(self.note.slug, self.form_data['slug'], 'Слаг не обновили')
+        self.assertEqual(
+            self.note.title, self.form_data['title'], 'Заголовок не обновили')
+        self.assertEqual(
+            self.note.text, self.form_data['text'], 'Текст не обновили')
+        self.assertEqual(
+            self.note.slug, self.form_data['slug'], 'Слаг не обновили')
 
     def test_author_can_delete_own_note(self):
         """Автор может удалить свою заметку"""
@@ -125,7 +133,8 @@ class TestLogicWithNote(TestLogic):
     def test_not_unique_slug(self):
         """Нельзя создать заметку со слагом, который уже существует"""
         self.form_data['slug'] = self.note.slug
-        response = self.author_client.post(self.create_url, data=self.form_data)
+        response = self.author_client.post(
+            self.create_url, data=self.form_data)
         error_message = self.note.slug + WARNING
         self.assertContains(response, error_message)
         self.assertEqual(Note.objects.count(), 1)
