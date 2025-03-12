@@ -60,8 +60,8 @@ class TestContent(TestCase):
             (self.client_author, self.urls['edit']),
         ]
         for client, url in test_cases:
-            response = client.get(url)
-            self.assertEqual(response.status_code, HTTPStatus.OK)
             with self.subTest(client=client, url=url):
+                response = client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
                 self.assertIn('form', response.context)
                 self.assertIsInstance(response.context['form'], NoteForm)
